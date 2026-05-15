@@ -401,32 +401,44 @@ async function login() {
        El resultado se compara contra los hashes de config.js.
        El salt se decodifica de Base64 en runtime y vive solo en memoria.
        ─────────────────────────────────────────────────────────────── */
-    const inputHash = await Security.pbkdf2salted(_salt, rawInput);
-    const hashes = _cfg.getUserHashes();
-    const adminHash = _cfg.getAdminHash();
+    const resp = await fetchWithTimeout(_endpoint, {
+    method: "POST",
+    credentials: "omit",
+    body: JSON.stringify({
+      action: "login",
+      hash: inputHash
+    })
+  });
 
-    if (!hashes.includes(inputHash)) {
-      Security.recordFail();
-      _showError(errorEl, "Usuario no autorizado.");
-      return;
-    }
+  if (!resp.ok) {
+    throw new Error(`HTTP ${resp.status}`);
+  }
 
-    /* ── Login exitoso ─────────────────────────────────────────────── */
-    Security.resetFails();
-    errorEl.style.display = "none";
+  const result = await resp.json();
 
-    _currentUser = rawInput;
-    _isAdmin = (inputHash === adminHash);
+  if (!result.success) {
+    Security.recordFail();
+    _showError(errorEl, "Usuario no autorizado.");
+    return;
+  }
 
-    sessionStorage.setItem("__sess_active", "1");
-    sessionStorage.setItem("__sess_role", _isAdmin ? "admin" : "student");
-    sessionStorage.setItem("__sess_user", rawInput);
+  Security.resetFails();
+  errorEl.style.display = "none";
 
-    _applySession(() => {
-      loadResources();
-    });
+  _currentUser = rawInput;
 
-    _resetIdleTimer();
+  /* TEMPORAL */
+  _isAdmin = true;
+
+  sessionStorage.setItem("__sess_active", "1");
+  sessionStorage.setItem("__sess_role", "admin");
+  sessionStorage.setItem("__sess_user", rawInput);
+
+  _applySession(() => {
+    loadResources();
+  });
+
+  _resetIdleTimer();
 
   } catch (err) {
 
