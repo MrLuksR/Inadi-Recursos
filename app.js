@@ -396,12 +396,11 @@ async function login() {
   btn.textContent = "Verificando…";
 
   try {
-    /* ── PBKDF2-SHA256 + Salt ──────────────────────────────────────────
-       PBKDF2(password=input, salt=salt_bytes, iter=200 000, PRF=SHA-256)
-       El resultado se compara contra los hashes de config.js.
-       El salt se decodifica de Base64 en runtime y vive solo en memoria.
-       ─────────────────────────────────────────────────────────────── */
-    const resp = await fetchWithTimeout(_endpoint, {
+   /* ── Generar hash PBKDF2 ───────────────────────────────────────── */
+  const inputHash = await Security.pbkdf2salted(_salt, rawInput);
+
+  /* ── Enviar login al backend ───────────────────────────────────── */
+  const resp = await fetchWithTimeout(_endpoint, {
     method: "POST",
     credentials: "omit",
     body: JSON.stringify({
@@ -428,10 +427,10 @@ async function login() {
   _currentUser = rawInput;
 
   /* TEMPORAL */
-  _isAdmin = true;
+  _isAdmin = (inputHash === _cfg.getAdminHash());
 
   sessionStorage.setItem("__sess_active", "1");
-  sessionStorage.setItem("__sess_role", "admin");
+  sessionStorage.setItem("__sess_role", _isAdmin ? "admin" : "user");
   sessionStorage.setItem("__sess_user", rawInput);
 
   _applySession(() => {
